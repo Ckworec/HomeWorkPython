@@ -20,16 +20,7 @@ def distance(point1, point2):
 def is_inside(circle, point): 
     return distance(circle.C, point) <= circle.R 
 
-def circle_center_at_3_points(a, b, c): #https://ru.wikipedia.org/wiki/Описанная_окружность#.D0.9F.D0.BE.D0.BB.D0.BE.D0.B6.D0.B5.D0.BD.D0.B8.D0.B5_.D1.86.D0.B5.D0.BD.D1.82.D1.80.D0.B0_.D0.BE.D0.BF.D0.B8.D1.81.D0.B0.D0.BD.D0.BD.D0.BE.D0.B9_.D0.BE.D0.BA.D1.80.D1.83.D0.B6.D0.BD.D0.BE.D1.81.D1.82.D0.B8
-    #D = 2 * ((point1.X * point2.Y + point1.Y * point3.X + point2.X * point3.Y - point3.X * point2.Y - point2.X * point1.Y - point1.X * point3.Y))
-    #x0 = ((point1.X ** 2 + point1.Y ** 2) * point2.Y + point1.Y * (point3.X ** 2 + point3.Y ** 2) + (point2.X ** 2 + point2.Y ** 2) * point3.Y - (point3.X ** 2 + point3.Y ** 2) * point2.Y - point3.Y * (point1.X ** 2 + point1.Y ** 2) - point1.Y * (point2.Y ** 2 + point2.Y ** 2)) / D
-    #y0 = -((point1.X ** 2 + point1.Y ** 2) * point2.X + point1.X * (point3.X ** 2 + point3.Y ** 2) + (point2.X ** 2 + point2.Y ** 2) * point3.X - (point3.X ** 2 + point3.Y ** 2) * point2.X - point3.X * (point1.X ** 2 + point1.Y ** 2) - point1.X * (point2.X ** 2 + point2.Y ** 2)) / D
-    
-    #B = bx * bx + by * by 
-    #C = cx * cx + cy * cy 
-    #D = bx * cy - by * cx 
-    #return Point((cy * B - by * C) / (2 * D), (bx * C - cx * B) / (2 * D))
-
+def circle_center_at_3_points(a, b, c):
     zx = (a.Y - b.Y) * (c.X * c.X + c.Y * c.Y) + (b.Y - c.Y) * (a.X * a.X + a.Y * a.Y) + (c.Y - a.Y) * (b.X * b.X + b.Y * b.Y)
     zy = (a.X - b.X) * (c.X * c.X + c.Y * c.Y) + (b.X - c.X) * (a.X * a.X + a.Y * a.Y) + (c.X - a.X) * (b.X * b.X + b.Y * b.Y)
     z = 2 * (a.X - b.X) * (c.Y - a.Y) - 2 * (a.Y - b.Y) * (c.X-a.X)

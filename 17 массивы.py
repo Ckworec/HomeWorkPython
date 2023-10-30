@@ -1,4 +1,4 @@
-n3= (13*29 + 7)%23 + 1
+n3= (13 * 29 + 7) % 23 + 1
 print(n3)
 
 with open('data.txt', 'r') as input_file:

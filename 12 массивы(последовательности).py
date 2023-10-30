@@ -1,4 +1,4 @@
-n1= (13*15)%46 + 1
+n1= (13 * 15) % 46 + 1
 print(n1)
 
 with open('data.txt', 'r') as input_file:
