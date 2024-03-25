@@ -16,35 +16,35 @@ pix2 = image2.load()
 for i in range(w):
 	for j in range(h):
 		#считаем яркость пиксела первого изображения
-		a = pix2[i, j][0]
-		b = pix2[i, j][1] 
-		c = pix2[i, j][2]
-		factor = (a + b + c) // 3
+		r = pix2[i, j][0]
+		g = pix2[i, j][1] 
+		b = pix2[i, j][2]
+		factor = (r + g + b) // 3
 
 		#считаем яркость пиксела второго изображения
-		a1 = pix[i, j][0]
-		b1 = pix[i, j][1] 
-		c1 = pix[i, j][2] 
-		factor1 = (a1 + b1 + c1) // 3
+		r1 = pix[i, j][0]
+		g1 = pix[i, j][1] 
+		b1 = pix[i, j][2] 
+		factor1 = (r1 + g1 + b1) // 3
 
 		#изменяем яркость пикселей
-		a1 = pix[i, j][0] + (factor - factor1)
-		b1 = pix[i, j][1] + (factor - factor1)
-		c1 = pix[i, j][2] + (factor - factor1)
+		r1 = pix[i, j][0] + (factor - factor1)
+		g1 = pix[i, j][1] + (factor - factor1)
+		b1 = pix[i, j][2] + (factor - factor1)
 
-		if (a1 < 0):
-			a1 = 0
+		if (r1 < 0):
+			r1 = 0
+		if (g1 < 0):
+			g1 = 0
 		if (b1 < 0):
 			b1 = 0
-		if (c1 < 0):
-			c1 = 0
-		if (a1 > 255):
-			a1 = 255
+		if (r1 > 255):
+			r1 = 255
+		if (g1 > 255):
+			g1 = 255
 		if (b1 > 255):
 			b1 = 255
-		if (c1 > 255):
-			c1 = 255
-		draw.point((i, j), (a1, b1, c1))
+		draw.point((i, j), (r1, g1, b1))
 
 image.save("result.bmp", "BMP")
 
