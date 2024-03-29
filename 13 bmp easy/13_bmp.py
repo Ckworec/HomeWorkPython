@@ -28,9 +28,9 @@ for i in range(w):
 		factor1 = (r1 + g1 + b1) // 3
 
 		#изменяем яркость пикселей
-		r1 = pix[i, j][0] + (factor - factor1)
-		g1 = pix[i, j][1] + (factor - factor1)
-		b1 = pix[i, j][2] + (factor - factor1)
+		r1 = round(pix[i, j][0] * (factor / factor1))
+		g1 = round(pix[i, j][1] * (factor / factor1))
+		b1 = round(pix[i, j][2] * (factor / factor1))
 
 		if (r1 < 0):
 			r1 = 0
