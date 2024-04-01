@@ -1,0 +1,178 @@
+\documentclass{article}
+\usepackage[T1,T2A]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[english,russian]{babel}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{makeidx}
+\usepackage{listings}
+\usepackage{setspace,amsmath}
+\newcommand\tab[1][1cm]{\hspace*{#1}}
+\begin{document}
+
+\begin{titlepage}
+\newpage
+
+\begin{center}
+МГУ им. М.Ю.Ломоносова \\
+\end{center}
+
+\vspace{8em}
+
+\begin{center}
+\Large Кафедра вычислительной механики \\ 
+\end{center}
+
+\vspace{2em}
+
+\begin{center}
+\textsc{\textbf{Отчёт по работе с BMP-изображениями в Python-3 \linebreak}}
+\end{center}
+
+\vspace{15em}
+
+
+
+\newbox{\lbox}
+\savebox{\lbox}{\hbox{Почеревин Роман Владимирович}}
+\newlength{\maxl}
+\setlength{\maxl}{\wd\lbox}
+\hfill\parbox{12cm}{
+\hspace*{8cm}\hspace*{-5cm}Студент:\hfill\hbox to\maxl{Скворцов Андрей Сергеевич\hfill}\\
+\hspace*{8cm}\hspace*{-5cm}Преподаватель:\hfill\hbox to\maxl{Почеревин Роман Владимирович}\\
+\\
+\hspace*{8cm}\hspace*{-5cm}Группа:\hfill\hbox to\maxl{223}\\
+}
+
+
+\vspace{\fill}
+
+\begin{center}
+Москва \\2024
+\end{center}
+
+\end{titlepage}
+
+\begin{center}
+
+
+{\large\bf Отчёт по работе с BMP-изображениями в Python-3}
+\end{center}
+\textit{З\,а\,д\,а\,н\,и\,е.} Реализовать алгоритмы фрактального сжатия и восстановления изображения.
+
+ 
+\textit{Р\,е\,ш\,е\,н\,и\,е.}  Используя библиотеку PIL, можно решить эту задачу эффективнее, чем, например, imageio:
+
+\textsf{from PIL import Image, ImageDraw }
+
+Пусть изображения заданы внутри программы. Выгрузим, посчитаем длину и ширину:
+{\usefont{T2A}{cmss}{m}{n}
+
+imin = Image.open("input.bmp")
+
+x1, y1 = imin.size
+
+px1 = imin.load()
+}
+
+ Далее созданим выходное изображение и возможность изменять в нем пиксели, а также введем необходимые переменные:
+{\usefont{T2A}{cmss}{m}{n}
+
+imout = Image.new("RGB", (x1, y1), (0, 0, 0))
+draw = ImageDraw.Draw(imout)
+
+\begin{equation}
+size_square = 15
+fractal = 0
+\end{equation}
+
+
+ Теперь - логика программы. Найдем среднюю яркость квадратного блока со стороной $size_square$ и запишем ее в переменную $factor $. Затем найдем среднюю яркость 3 соседних блоков того же размера и сохраним их значения в список $factora $.
+ 
+{\usefont{T2A}{cmss}{m}{n}
+
+for i in range(0, x1, size_square):
+\tab[1cm]	for j in range(0, y1, size_square):
+\tab[2cm]		if i + 2 * size_square - 1 < x1 and j + 2 * size_square - 1 < y1:
+\tab[3cm]			for k in range(size_square):
+\tab[4cm]				for t in range(size_square):
+\tab[5cm]					r = px1[i + k, j + t][0]
+\tab[5cm]					g = px1[i + k, j + t][1]
+\tab[5cm]					b = px1[i + k, j + t][2]
+
+\tab[5cm]					fractal += (r + g + b) // 3
+		
+\tab[3cm]			fractala = [0] * 3
+
+\tab[3cm]			for k in range(size_square):
+\tab[4cm]				for t in range(size_square):
+\tab[5cm]					r = px1[i + size_square + k, j + t][0]
+\tab[5cm]					g = px1[i + size_square + k, j + t][1]
+\tab[5cm]					b = px1[i + size_square + k, j + t][2]
+
+\tab[5cm]					fractala[0] += (r + g + b) // 3
+
+\tab[3cm]			for k in range(size_square):
+\tab[4cm]				for t in range(size_square):
+\tab[5cm]					r = px1[i + k, j + size_square + t][0]
+\tab[5cm]					g = px1[i + k, j + size_square + t][1]
+\tab[5cm]					b = px1[i + k, j + size_square + t][2]
+
+\tab[5cm]					fractala[1] += (r + g + b) // 3
+
+\tab[3cm]			for k in range(size_square):
+\tab[4cm]				for t in range(size_square):
+\tab[5cm]					r = px1[i + size_square + k, j + size_square + t][0]
+\tab[5cm]					g = px1[i + size_square + k, j + size_square + t][1]
+\tab[5cm]					b = px1[i + size_square + k, j + size_square + t][2]
+
+\tab[5cm]					fractala[2] += (r + g + b) // 3
+}
+
+Теперь посмотрим какой из этих 3 блок больше похож на первый сравнивая их по средней яркости и заменяя все 4 блока на самый похожий:
+
+{\usefont{T2A}{cmss}{m}{n}
+
+\tab[3cm]			fractala[0] = abs(fractal - fractala[0])
+\tab[3cm]			fractala[1] = abs(fractal - fractala[1])
+\tab[3cm]			fractala[2] = abs(fractal - fractala[2])
+
+\tab[3cm]			min_difference = min(fractala)
+
+\tab[3cm]			index = fractala.index(min_difference)
+
+\tab[3cm]			for k in range(2 * size_square):
+\tab[4cm]				for t in range(2 * size_square):
+\tab[5cm]					if index == 0:
+\tab[6cm]						draw.point((i + k, j + t), (px1[i + size_square + k % size_square, j + t % size_square][0], px1[i + size_square + k % size_square, j + t % size_square][1], px1[i + size_square + k % size_square, j + t % size_square][2]))
+\tab[5cm]					elif index == 1:
+\tab[6cm]						draw.point((i + k, j + t), (px1[i + k % size_square, j + size_square + t % size_square][0], px1[i + k % size_square, j + size_square + t % size_square][1], px1[i + k % size_square, j + size_square + t % size_square][2]))
+\tab[5cm]					else:
+\tab[6cm]						draw.point((i + k, j + t), (px1[i + size_square + k % size_square, j + size_square + t % size_square][0], px1[i + size_square + k % size_square, j + size_square + t % size_square][1], px1[i + size_square + k % size_square, j + size_square + t % size_square][2]))
+}
+\vspace{1em}
+
+Теперь нарисуем оставшиеся блоки также как в исходном изображени:
+
+{\usefont{T2A}{cmss}{m}{n}
+
+\tab[2cm]		else:
+\tab[3cm]			for k in range(x1 - i):
+\tab[4cm]				for t in range(y1 - j):
+\tab[5cm]					draw.point((i + k, j + t), (px1[i + k, j + t][0], px1[i + k, j + t][1], px1[i + k, j + t][2]))
+}
+\vspace{1em}
+
+
+Сохраним изображение и очистим память от элемента $draw$:
+\vspace{1em}
+	
+{\usefont{T2A}{cmss}{m}{n}
+
+imout.save("out.bmp", "BMP")
+
+del draw
+}
+  
+\end{document}
