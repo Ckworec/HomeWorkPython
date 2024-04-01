@@ -1,0 +1,175 @@
+\documentclass{article}
+\usepackage[T1,T2A]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[english,russian]{babel}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{makeidx}
+\usepackage{setspace,amsmath}
+\newcommand\tab[1][1cm]{\hspace*{#1}}
+\begin{document}
+
+\begin{titlepage}
+\newpage
+
+\begin{center}
+МГУ им. М.Ю.Ломоносова \\
+\end{center}
+
+\vspace{8em}
+
+\begin{center}
+\Large Кафедра гигачадов \\ 
+\end{center}
+
+\vspace{2em}
+
+\begin{center}
+\textsc{\textbf{Отчёт по работе с BMP-изображениями в Python-3 \linebreak}}
+\end{center}
+
+\vspace{15em}
+
+
+
+\newbox{\lbox}
+\savebox{\lbox}{\hbox{Почеревин Роман Владимирович}}
+\newlength{\maxl}
+\setlength{\maxl}{\wd\lbox}
+\hfill\parbox{12cm}{
+\hspace*{8cm}\hspace*{-5cm}Студент:\hfill\hbox to\maxl{Скворцов Андрей Сергеевич\hfill}\\
+\hspace*{8cm}\hspace*{-5cm}Преподаватель:\hfill\hbox to\maxl{Почеревин Роман Владимирович}\\
+\\
+\hspace*{8cm}\hspace*{-5cm}Группа:\hfill\hbox to\maxl{223}\\
+}
+
+
+\vspace{\fill}
+
+\begin{center}
+Москва \\2024
+\end{center}
+
+\end{titlepage}
+
+\begin{center}
+
+
+{\large\bf Отчёт по работе с BMP-изображениями в Python-3}
+\end{center}
+\textit{З\,а\,д\,а\,н\,и\,е.} Программа должна загрузить изображения из графических файлов
+InputFile1 и InputFile2 (размеры входных файлов должны совпадать),
+изменить яркость каждого пиксела первого изображения так, чтобы она
+равнялась бы яркости соответствующего пиксела второго изображения
+и вывести получившееся изображение в графический файл OutputFile.
+Под яркостью пиксела подразумевается сумма компонент всех трех компонент пиксела.
+
+ 
+\textit{Р\,е\,ш\,е\,н\,и\,е.}  Используя библиотеку PIL, можно решить эту задачу эффективнее, чем, например, imageio:
+
+\textsf{from PIL import Image, ImageDraw }
+
+Пусть изображения заданы внутри программы (на примере - "ironman.bmp", "osuzdayu.bmp"). Выгрузим их и посчитаем длину и ширину. На всякий случай, в выходном изображении сделаем минимальную из двух длин и ширин:
+
+{\usefont{T2A}{cmss}{m}{n}
+
+image = Image.open("ironman.bmp")
+ 
+image2 =  Image.open("osuzdayu.bmp") 
+
+draw = ImageDraw.Draw(image) 
+
+width = image.size[0]  
+
+height = image.size[1]  
+
+width2 = image2.size[0]  
+
+height2 = image2.size[1]  
+
+w=min(width, width2)
+
+h=min(height, height2)	
+
+pix = image.load() 
+
+pix2 = image2.load() }
+
+
+ Теперь - логика программы. Найдем яркость пикселя второго изображения и присвоим ей значение $factor $. Затем найдем яркость пикселя первого изображения и присвоим ей значение $factor1 $.
+ 
+{\usefont{T2A}{cmss}{m}{n}
+
+for i in range(w):
+
+\tab[1cm] for j in range(h):
+
+\tab[2cm]		a = pix2[i, j][0] 
+
+\tab[2cm]		b = pix2[i, j][1] 
+
+\tab[2cm]		c = pix2[i, j][2]
+
+\tab[2cm]		factor = (a+b+c)//3
+
+
+\tab[2cm]		a1 = pix[i, j][0]  
+
+\tab[2cm]		b1 = pix[i, j][1] 
+
+\tab[2cm]		c1 = pix[i, j][2] 
+
+\tab[2cm]		factor1 = (a1+b1+c1)//3
+}
+
+\newpage
+Теперь перестроим первое изображение так, чтобы яркость его пикселов равнялась яркости яркости соответствующих пикселов второго. 
+
+{\usefont{T2A}{cmss}{m}{n}
+
+a1 = round(pix[i, j][0] * (factor / factor1))
+
+b1 = round(pix[i, j][1] * (factor / factor1))
+
+c1 = round(pix[i, j][2] * (factor / factor1))
+
+if (a1 < 0):
+
+\tab[1cm]		a1 = 0
+
+if (b1 < 0):
+
+\tab[1cm]		b1 = 0
+
+if (c1 < 0):
+
+\tab[1cm]		c1 = 0
+
+if (a1 > 255):
+
+\tab[1cm]		a1 = 255
+
+if (b1 > 255):
+
+\tab[1cm]		b1 = 255
+
+if (c1 > 255):
+
+\tab[1cm]		c1 = 255
+
+draw.point((i, j), (a1, b1, c1))}
+\vspace{1em}
+
+
+Сохраним изображение и очистим память от элемента $draw$:
+\vspace{1em}
+	
+{\usefont{T2A}{cmss}{m}{n}
+
+image.save("result.bmp", "BMP")
+
+del draw
+ }
+  
+\end{document}
