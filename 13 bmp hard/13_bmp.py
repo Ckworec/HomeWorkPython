@@ -43,10 +43,10 @@ def fractal_compress(image, tolerance):
             block_diff = np.abs(block_means - block_means[i, j]) # Поэлементное взятие модуля
             similar_blocks[i, j] = np.argwhere(block_diff <= tolerance).tolist()
 
-    compressed_image = np.zeros_like(image_gray)
+    compressed_image = np.zeros_like(image_gray[:,:height // block_size])
 
     for i in range(width // block_size):
-        for j in range(height // block_size):
+        for j in range((height // block_size) // 4):
             block_indices = similar_blocks[i, j]
             for index in block_indices:
                 x, y = index
@@ -71,7 +71,7 @@ def fractal_decompress(compressed_image, original_image, tolerance):
 
     for i in range(0, width, block_size):
         for j in range(0, height, block_size):
-            block = compressed_image_gray[i:i + block_size, j:j + block_size]
+            block = compressed_image_gray[i:i + block_size, j % (height // block_size) // 4:j % (height // block_size) // 4 + block_size]
             diff = np.abs(original_image_gray[i:i + block_size, j:j + block_size] - block)
             if np.mean(diff) <= tolerance:
                 compressed_image[i:i + block_size, j:j + block_size] = block
