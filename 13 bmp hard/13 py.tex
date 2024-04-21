@@ -59,49 +59,102 @@
 \textit{З\,а\,д\,а\,н\,и\,е.} Реализовать алгоритмы фрактального сжатия и восстановления изображения.
 
  
-\textit{Р\,е\,ш\,е\,н\,и\,е.}  Используя библиотеку PIL, можно решить эту задачу эффективнее, чем, например, imageio:
+\textit{Р\,е\,ш\,е\,н\,и\,е.}  Используя библиотеки numpy и scipy, можно решить эту задачу проще:
 
-\textsf{from PIL import Image, ImageDraw }
+\textsf{
+	from scipy import ndimage
+	import numpy as np }
 
-Пусть изображения заданы внутри программы. Выгрузим, посчитаем длину и ширину:
+Пусть изображения заданы внутри программы. Выгрузим его как черно-белое при помощи функции get_greyscale_image(img):
 {\usefont{T2A}{cmss}{m}{n}
 
-imin = Image.open("input.bmp")
-
-x1, y1 = imin.size
-
-px1 = imin.load()
+def get_greyscale_image(img):
+	return np.mean(img[:,:,:2], 2)
 }
 
- Далее созданим выходное изображение и возможность изменять в нем пиксели, а также введем необходимые переменные:
+Далее разобьем изображение на нужные нам блоки размера 4 на 4 вместо 8 на 8 при помощи функции reduce(img, factor):
 {\usefont{T2A}{cmss}{m}{n}
 
-imout = Image.new("RGB", (x1, y1), (0, 0, 0))
-draw = ImageDraw.Draw(imout)
+def reduce(img, factor):
+result = np.zeros((img.shape[0] // factor, img.shape[1] // factor))
+for i in range(result.shape[0]):
+for j in range(result.shape[1]):
+result[i, j] = np.mean(img[i * factor:(i + 1) * factor,j * factor:(j + 1) * factor])
 
-\begin{equation}
-size_square = 15
-fractal = 0
-\end{equation}
+return result
+}
 
 
- Теперь - логика программы. Найдем среднюю яркость квадратного блока со стороной $size_square$ и запишем ее в переменную $factor $. Затем найдем среднюю яркость 3 соседних блоков того же размера и сохраним их значения в список $factora $.
+Теперь рассмотрим сам алгоритм фрактального сжатия изображения. Оно происходит при вызове функции compress. Сначала мы генерируем всевозможные блоки, которые мы можем получить при помощи нашего отображения, при помощи
+функции generate_all_transformed_blocks:
  
 {\usefont{T2A}{cmss}{m}{n}
+def generate_all_transformed_blocks(img, source_size_block, destination_size_block, step):
+	factor = source_size_block // destination_size_block
+	transformed_blocks = []
+	for k in range((img.shape[0] - source_size_block) // step + 1):
+		for l in range((img.shape[1] - source_size_block) // step + 1):
+			# Преобразуем исходный блок в конечный (доменный -> ранговый)
+			S = reduce(img[k * step:k * step + source_size_block,l * step:l * step + source_size_block], factor)
+			# Всевозможные преобразования при помощи найшего сжимающего изображения
+			for direction, angle in candidates:
+				transformed_blocks.append((k, l, direction, angle, apply_transformation(S, direction, angle)))
 
+	return transformed_blocks
 }
 
-Теперь посмотрим какой из этих 3 блок больше похож на первый сравнивая их по средней яркости и заменяя все 4 блока на самый похожий:
+Далее для каждого блока размером 8 на 8 ищем наиболее похожий на него блок размера 4 на 4:
 
 {\usefont{T2A}{cmss}{m}{n}
+def compress(img, source_size_block, destination_size_block, step):
+	transformations = []
+	transformed_blocks = generate_all_transformed_blocks(img, source_size_block, destination_size_block, step) # Генерируем всевозможные преобразования
+	i_count = img.shape[0] // destination_size_block
+	j_count = img.shape[1] // destination_size_block
+	for i in range(i_count):
+		transformations.append([])
+		for j in range(j_count):
+			# print("{}/{} ; {}/{}".format(i, i_count, j, j_count))
+			transformations[i].append(None)
+			min_d = float('inf')
+			# Берем доменный блок
+			D = img[i * destination_size_block:(i + 1) * destination_size_block,j * destination_size_block:(j + 1) * destination_size_block]
+			# Выбираем самый похожий блок
+			for k, l, direction, angle, S in transformed_blocks:
+				contrast, brightness = find_contrast_and_brightness2(D, S)
+				S = contrast * S + brightness
+				d = np.sum(np.square(D - S)) # Сумма квадратов D - S (типа square это поэлементый квадрат)
+				# Ищем самый похожий блок
+				if d < min_d:
+					min_d = d
+					transformations[i][j] = (k, l, direction, angle, contrast, brightness)
 
+	return transformations
 }
 \vspace{1em}
 
-Теперь нарисуем оставшиеся блоки также как в исходном изображени:
+Теперь рассмотрим алгоритм восстановления описанный в функции decompress. Самое полезное для нас в сжимающем отображении это наличие неподвижных точек в каждом блоке, поэтому для восстановления изображения 
+нужно просто применить это отображение несколько раз к массиву полученному при сжатии:
 
 {\usefont{T2A}{cmss}{m}{n}
+def decompress(transformations, source_size_block, destination_size_block, step, nb_iter = 8):
+	factor = source_size_block // destination_size_block
+	height = len(transformations) * destination_size_block
+	width = len(transformations[0]) * destination_size_block
+	iterations = [np.random.randint(0, 256, (height, width))]
+	cur_img = np.zeros((height, width))
+	for i_iter in range(nb_iter):
+		for i in range(len(transformations)):
+			for j in range(len(transformations[i])):
+				# Применяем отображение
+				k, l, flip, angle, contrast, brightness = transformations[i][j]
+				S = reduce(iterations[-1][k * step:k * step + source_size_block,l * step:l * step + source_size_block], factor)
+				D = apply_transformation(S, flip, angle, contrast, brightness)
+				cur_img[i * destination_size_block:(i + 1) * destination_size_block,j * destination_size_block:(j + 1) * destination_size_block] = D
+		iterations.append(cur_img)
+		cur_img = np.zeros((height, width))
 
+	return iterations
 }
 \vspace{1em}
 

@@ -1,99 +1,208 @@
-import numpy as np
-from skimage import io, util, measure
 import matplotlib.pyplot as plt
-from PIL import Image 
+import matplotlib.image as mpimg
+from scipy import ndimage
+from scipy import optimize
+import numpy as np
+from PIL import Image
 
-"""
-tolerance - означает допустимое отклонение при сравнении блоков изображения в процессе сжатия и декомпрессии. 
-Значение tolerance определяет, насколько похожи блоки должны быть, 
-чтобы считаться одинаковыми и заменяться друг другом в процессе сжатия и декомпрессии. 
-Уменьшение значения tolerance приведет к более точному сжатию изображения, 
-но может увеличить размер результирующего файла. Увеличение значения tolerance, 
-наоборот, может уменьшить размер результирующего файла, 
-но может привести к некоторой потере качества изображения.
-"""
+# Manipulate channels
 
-def fractal_compress(image, tolerance):
-    # Сконвертировать изображение в черно-белое
-    image_gray = util.img_as_float(image)
-    if len(image_gray.shape) > 2:
-        image_gray = util.img_as_float(image_gray[:,:,0])
+def get_greyscale_image(img):
+    return np.mean(img[:,:,:2], 2)
 
-    # Получить количество блоков и их размер
-    block_size = 4
-    width, height = image_gray.shape
-    num_blocks = (width // block_size) * (height // block_size)
+# Transformations
 
-    # Разбить изображение на блоки
-    blocks = image_gray[:width - width % block_size, :height - height % block_size].reshape(width // block_size, height // block_size, block_size, block_size)
+def scale_image(input_file, output_file, scale):
+    try:
+        img = Image.open(input_file)
+        width, height = img.size
+        new_width = width * scale
+        new_height = height * scale
+        new_img = Image.new('RGB',(new_width, new_height))
 
-    # Найти среднее значение каждого блока
-    # Заполняем массив нулями
-    block_means = np.zeros((width // block_size, height // block_size))
+        for k in range(new_width):
+            for l in range(new_height):
+                i = k // scale
+                j = l // scale
+                pixel_sum = [0,0,0]
+                for x in range(2):
+                    for y in range(2):
+                        if i + x < width and j + y < height:
+                            pixel = img.getpixel((i + x, j + y))
+                            pixel_sum[0] += pixel[0]
+                            pixel_sum[1] += pixel[1]
+                            pixel_sum[2] += pixel[2]
+                pixel_avg=(pixel_sum[0] // 4, pixel_sum[1] // 4, pixel_sum[2] // 4)
+                new_img.putpixel((k, l), pixel_avg)
+        new_img.save(output_file)
+    except Exception as e:
+        print(f"An error occurred: {e}")
 
-    for i in range(width // block_size):
-        for j in range(height // block_size):
-            block_means[i, j] = np.mean(blocks[i, j]) # Среднее арифметическое блока
+# Функция для перехода от блоков 8 на 8 к блокам 4 на 4
+def reduce(img, factor):
+    result = np.zeros((img.shape[0] // factor, img.shape[1] // factor))
+    for i in range(result.shape[0]):
+        for j in range(result.shape[1]):
+            result[i, j] = np.mean(img[i * factor:(i + 1) * factor,j * factor:(j + 1) * factor])
 
-    # Найти наиболее схожие блоки
-    similar_blocks = np.zeros((width // block_size, height // block_size), dtype = object) # Узнать что такое object
+    return result
 
-    for i in range(width // block_size):
-        for j in range(height // block_size):
-            block_diff = np.abs(block_means - block_means[i, j]) # Поэлементное взятие модуля
-            similar_blocks[i, j] = np.argwhere(block_diff <= tolerance).tolist()
+def rotate(img, angle):
+    return ndimage.rotate(img, angle, reshape = False)
 
-    compressed_image = np.zeros_like(image_gray[:,:height // block_size])
+def flip(img, direction): # Отражает изображение зеркально, если direction равно -1 и не отражает, если значение равно 1
+    return img[::direction,:]
 
-    for i in range(width // block_size):
-        for j in range((height // block_size) // 4):
-            block_indices = similar_blocks[i, j]
-            for index in block_indices:
-                x, y = index
-                compressed_image[i * block_size:(i + 1) * block_size, j * block_size:(j + 1) * block_size] = blocks[x, y]
+def apply_transformation(img, direction, angle, contrast = 1.0, brightness = 0.0): # сжимающее отображение
+    return contrast * rotate(flip(img, direction), angle) + brightness
 
-    return compressed_image
+# Contrast and brightness
 
-def fractal_decompress(compressed_image, original_image, tolerance):
-    # Декомпрессия изображения
-    compressed_image_gray = util.img_as_float(compressed_image)
-    if len(compressed_image_gray.shape) > 2:
-        compressed_image_gray = util.img_as_float(compressed_image_gray[:,:,0])
+# Подбираем подходящие яркость и контрастность методом наименьших квадратов https://colab.research.google.com/drive/1MhWrDx0RsNrt4DWsk583Xb-CAm6z27s8?usp=sharing
+def find_contrast_and_brightness2(D, S):
+    A = np.concatenate((np.ones((S.size, 1)), np.reshape(S, (S.size, 1))), axis = 1) # Объединение массивов вдоль оси
+    b = np.reshape(D, (D.size,))
+    x, _, _, _ = np.linalg.lstsq(A, b, rcond=None) # Решение матричного уравнения методом наименьших квадратов
 
-    original_image_gray = util.img_as_float(original_image)
+    return x[1], x[0]
 
-    if len(original_image_gray.shape) > 2:
-        original_image_gray = util.img_as_float(original_image_gray[:,:,0])
+# Compress / decompress
 
-    compressed_image = np.zeros_like(original_image_gray)
-    block_size = 4
-    width, height = compressed_image_gray.shape
+def generate_all_transformed_blocks(img, source_size_block, destination_size_block, step):
+    factor = source_size_block // destination_size_block
+    transformed_blocks = []
+    for k in range((img.shape[0] - source_size_block) // step + 1):
+        for l in range((img.shape[1] - source_size_block) // step + 1):
+            # Преобразуем исходный блок в конечный (доменный -> ранговый)
+            S = reduce(img[k * step:k * step + source_size_block,l * step:l * step + source_size_block], factor)
+            # Всевозможные преобразования при помощи найшего сжимающего изображения
+            for direction, angle in candidates:
+                transformed_blocks.append((k, l, direction, angle, apply_transformation(S, direction, angle)))
+    
+    return transformed_blocks
 
-    for i in range(0, width, block_size):
-        for j in range(0, height, block_size):
-            block = compressed_image_gray[i:i + block_size, j % (height // block_size) // 4:j % (height // block_size) // 4 + block_size]
-            diff = np.abs(original_image_gray[i:i + block_size, j:j + block_size] - block)
-            if np.mean(diff) <= tolerance:
-                compressed_image[i:i + block_size, j:j + block_size] = block
-            else:
-                compressed_image[i:i + block_size, j:j + block_size] = original_image_gray[i:i + block_size, j:j + block_size]
+def compress(img, source_size_block, destination_size_block, step):
+    transformations = []
+    transformations_no_fratal = []
+    transformed_blocks = generate_all_transformed_blocks(img, source_size_block, destination_size_block, step) # Генерируем всевозможные преобразования
+    i_count = img.shape[0] // destination_size_block
+    j_count = img.shape[1] // destination_size_block
+    for i in range(i_count):
+        transformations.append([])
+        transformations_no_fratal.append([])
+        for j in range(j_count):
+            # print("{}/{} ; {}/{}".format(i, i_count, j, j_count))
+            transformations[i].append(None)
+            transformations_no_fratal[i].append(None)
+            min_d = float('inf')
+            # Берем доменный блок
+            D = img[i * destination_size_block:(i + 1) * destination_size_block,j * destination_size_block:(j + 1) * destination_size_block]
+            # Выбираем самый похожий блок
+            for k, l, direction, angle, S in transformed_blocks:
+                contrast, brightness = find_contrast_and_brightness2(D, S)
+                S = contrast * S + brightness
+                d = np.sum(np.square(D - S)) # Сумма квадратов D - S (типа square это поэлементый квадрат)
+                # Ищем самый похожий блок
+                if d < min_d:
+                    min_d = d
+                    transformations[i][j] = (k, l, direction, angle, contrast, brightness)
+                    transformations_no_fratal[i][j] = S
+    
+    np.save('save_data_{}'.format(number), transformations_no_fratal)
+    
+    return transformations
 
-    return compressed_image
+def decompress(transformations, source_size_block, destination_size_block, step, nb_iter):
+    factor = source_size_block // destination_size_block
+    height = len(transformations) * destination_size_block
+    width = len(transformations[0]) * destination_size_block
+    iterations = [np.random.randint(0, 256, (height, width))]
+    cur_img = np.zeros((height, width))
+    for i_iter in range(nb_iter):
+        for i in range(len(transformations)):
+            for j in range(len(transformations[i])):
+                # Применяем отображение
+                k, l, flip, angle, contrast, brightness = transformations[i][j]
+                k = int(k)
+                l = int(l)
+                flip = int(flip)
+                S = reduce(iterations[-1][k * step:k * step + source_size_block,l * step:l * step + source_size_block], factor)
+                D = apply_transformation(S, flip, angle, contrast, brightness)
+                cur_img[i * destination_size_block:(i + 1) * destination_size_block,j * destination_size_block:(j + 1) * destination_size_block] = D
+        iterations.append(cur_img)
+        cur_img = np.zeros((height, width))
+    
+    return iterations
 
-# Загрузить изображение
-image = io.imread('input.bmp')
+def decompress_ultra_mega_sposob(transformations, source_size_block, destination_size_block):
+    height = len(transformations) * destination_size_block
+    width = len(transformations[0]) * destination_size_block
+    cur_img = np.zeros((height, width))
 
-# Сжать изображение
-compressed_image = fractal_compress(image, tolerance = 0.2)
+    for i in range(len(transformations)):
+            for j in range(len(transformations[i])):
+                cur_img[i * destination_size_block:(i + 1) * destination_size_block,j * destination_size_block:(j + 1) * destination_size_block] = transformations[i][j]
+    
+    return cur_img
+  
+# Parameters
 
-# Восстановить изображение
-reconstructed_image = fractal_decompress(compressed_image, image, tolerance = 0.2)
+directions = [1, -1]
+angles = [0, 90, 180, 270] # Для сохранения формы изображения угол может принимать только такие значения
+candidates = [[direction, angle] for direction in directions for angle in angles]
+number = 0
+number1 = 0
+size_block_r = 4 # размер блока в который перейдет
+size_block_d = 8 # размер блока который переходит
+step = 8
+nb_iter = 8 # сколько раз применится отображение
 
-# Отобразить изображения
-io.imshow(image)
+if __name__ == '__main__':
+    print( "Commands: \n 1. Compress image \n 2. Decompress image from fractal \n 3. Decompress image from mega ultra sposob \n 0. Exit \n\n Enter command: ", end = '')
 
-io.imshow(compressed_image)
-plt.imsave('compress.bmp', compressed_image, cmap='gray')
+    command = int(input())
 
-io.imshow(reconstructed_image)
-plt.imsave('result.bmp', reconstructed_image, cmap='gray')
+    while command != 0:
+        if command == 1:
+            print(" Enter name of image: ", end = '')
+            img_name = input()
+
+            img = mpimg.imread(img_name)
+            img = get_greyscale_image(img)
+            img = reduce(img, size_block_r)
+            number = img_name[-5]
+
+            transformations = compress(img, size_block_d, size_block_r, step)
+
+            np.save('save_data_fractal_{}'.format(number), transformations)
+
+            print("\n")
+
+        elif command == 2:
+            print(" Enter number file with compressed cofficient: ", end = '')
+            file_name = 'save_data_fractal_' + input() + '.npy'
+            transform = np.load(file_name)
+
+            number1 = file_name[-5]
+            
+            iterations = decompress(transform, size_block_d, size_block_r, step, nb_iter)
+            plt.imsave('result_{}.bmp'.format(number1), iterations[nb_iter - 1], cmap='gray')
+            scale_image('result_{}.bmp'.format(number1), 'result_{}.bmp'.format(number1), 4)
+
+            print("\n")
+
+        elif command == 3:
+            print(" Enter number file with compressed cofficient: ", end = '')
+            file_name = 'save_data_' + input() + '.npy'
+            transform = np.load(file_name)
+
+            number1 = file_name[-5]
+
+            iterations = decompress_ultra_mega_sposob(transform, size_block_d, size_block_r)
+            plt.imsave('result_ultra_mega_sposob_{}.bmp'.format(number1), iterations, cmap='gray')
+            scale_image('result_ultra_mega_sposob_{}.bmp'.format(number1), 'result_ultra_mega_sposob_{}.bmp'.format(number1), 4)
+
+            print("\n")
+
+        print(" Enter command: ", end = '')
+        command = int(input())
