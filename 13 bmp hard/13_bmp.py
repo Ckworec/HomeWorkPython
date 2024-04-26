@@ -1,9 +1,10 @@
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 from scipy import ndimage
-from scipy import optimize
 import numpy as np
 from PIL import Image
+import multiprocessing as mp
+import datetime
 
 # Manipulate channels
 
@@ -81,7 +82,7 @@ def generate_all_transformed_blocks(img, source_size_block, destination_size_blo
     
     return transformed_blocks
 
-def compress(img, source_size_block, destination_size_block, step):
+def compress(img, source_size_block, destination_size_block, step, transformations, transformations_no_fratal, number):
     transformations = []
     transformations_no_fratal = []
     transformed_blocks = generate_all_transformed_blocks(img, source_size_block, destination_size_block, step) # Генерируем всевозможные преобразования
@@ -109,6 +110,7 @@ def compress(img, source_size_block, destination_size_block, step):
                     transformations_no_fratal[i][j] = S
     
     np.save('save_data_{}'.format(number), transformations_no_fratal)
+    np.save('save_data_fractal_{}'.format(number), transformations)
     
     return transformations
 
@@ -152,10 +154,10 @@ angles = [0, 90, 180, 270] # Для сохранения формы изобра
 candidates = [[direction, angle] for direction in directions for angle in angles]
 number = 0
 number1 = 0
-size_block_r = 4 # размер блока в который перейдет
-size_block_d = 8 # размер блока который переходит
-step = 8
-nb_iter = 8 # сколько раз применится отображение
+size_block_r = 5 # размер блока в который перейдет
+size_block_d = 10 # размер блока который переходит
+step = size_block_d
+nb_iter = 50 # сколько раз применится отображение
 
 if __name__ == '__main__':
     print( "Commands: \n 1. Compress image \n 2. Decompress image from fractal \n 3. Decompress image from mega ultra sposob \n 0. Exit \n\n Enter command: ", end = '')
@@ -172,9 +174,25 @@ if __name__ == '__main__':
             img = reduce(img, size_block_r)
             number = img_name[-5]
 
-            transformations = compress(img, size_block_d, size_block_r, step)
+            i_count = img.shape[0] // size_block_r
+            j_count = img.shape[1] // size_block_r
+            transformations = []
+            transformations_no_fractal = []
+            for i in range(i_count):
+                transformations.append([])
+                transformations_no_fractal.append([])
+                for j in range(j_count):
+                    transformations[i].append([])
+                    transformations_no_fractal[i].append([])
 
-            np.save('save_data_fractal_{}'.format(number), transformations)
+            start = datetime.datetime.now()
+            p = mp.Process(target=compress, args=(img, size_block_d, size_block_r, step, transformations, transformations_no_fractal, number))
+            # transformations = compress(img, size_block_d, size_block_r, step)
+            p.start()
+            p.join()
+            end = datetime.datetime.now()
+
+            print(" Time compression: ", end - start)
 
             print("\n")
 
@@ -187,7 +205,7 @@ if __name__ == '__main__':
             
             iterations = decompress(transform, size_block_d, size_block_r, step, nb_iter)
             plt.imsave('result_{}.bmp'.format(number1), iterations[nb_iter - 1], cmap='gray')
-            scale_image('result_{}.bmp'.format(number1), 'result_{}.bmp'.format(number1), 4)
+            scale_image('result_{}.bmp'.format(number1), 'result_{}.bmp'.format(number1), size_block_r)
 
             print("\n")
 
@@ -200,7 +218,7 @@ if __name__ == '__main__':
 
             iterations = decompress_ultra_mega_sposob(transform, size_block_d, size_block_r)
             plt.imsave('result_ultra_mega_sposob_{}.bmp'.format(number1), iterations, cmap='gray')
-            scale_image('result_ultra_mega_sposob_{}.bmp'.format(number1), 'result_ultra_mega_sposob_{}.bmp'.format(number1), 4)
+            scale_image('result_ultra_mega_sposob_{}.bmp'.format(number1), 'result_ultra_mega_sposob_{}.bmp'.format(number1), size_block_r)
 
             print("\n")
 
