@@ -92,7 +92,6 @@ def compress(img, source_size_block, destination_size_block, step, transformatio
         transformations.append([])
         transformations_no_fratal.append([])
         for j in range(j_count):
-            # print("{}/{} ; {}/{}".format(i, i_count, j, j_count))
             transformations[i].append(None)
             transformations_no_fratal[i].append(None)
             min_d = float('inf')
@@ -154,8 +153,8 @@ angles = [0, 90, 180, 270] # Для сохранения формы изобра
 candidates = [[direction, angle] for direction in directions for angle in angles]
 number = 0
 number1 = 0
-size_block_r = 5 # размер блока в который перейдет
-size_block_d = 10 # размер блока который переходит
+size_block_r = 4 # размер блока в который перейдет
+size_block_d = 8 # размер блока который переходит
 step = size_block_d
 nb_iter = 50 # сколько раз применится отображение
 
@@ -169,7 +168,34 @@ if __name__ == '__main__':
             print(" Enter name of image: ", end = '')
             img_name = input()
 
+            print("\n How do you want to compress the image:\n 1. Maximum compression with severe quality loss\n 2. Maximum preservation of image quality with a large investment of time\n 3. Optimal choice of coefficients\n")
+
+            command = int(input("Enter command: "))
+
             img = mpimg.imread(img_name)
+
+            if command == 1:
+                size_block_d = 10
+                size_block_r = 5
+                step = size_block_d
+                skip_transformation = 0
+            elif command == 2:
+                size_block_d = 4
+                size_block_r = 2
+                step = size_block_d
+                skip_transformation = 10
+            elif command == 3:
+                if img.shape[0] > 500 or img.shape[1] > 500:
+                    size_block_d = 8
+                    size_block_r = 4
+                    step = size_block_d
+                    skip_transformation = 50
+                else:
+                    size_block_d = 6
+                    size_block_r = 3
+                    step = size_block_d
+                    skip_transformation = 0
+
             img = get_greyscale_image(img)
             img = reduce(img, size_block_r)
             number = img_name[-5]
@@ -187,7 +213,6 @@ if __name__ == '__main__':
 
             start = datetime.datetime.now()
             p = mp.Process(target=compress, args=(img, size_block_d, size_block_r, step, transformations, transformations_no_fractal, number))
-            # transformations = compress(img, size_block_d, size_block_r, step)
             p.start()
             p.join()
             end = datetime.datetime.now()
